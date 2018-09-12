@@ -1,4 +1,4 @@
-package GoUtils
+package goutils
 
 import (
 	"archive/tar"
@@ -9,7 +9,7 @@ import (
 	"os"
 )
 
-//DownloadFile This utility function downloads the file and extracts it to a given location
+//ExtractFromRemoteFile This utility function downloads the file and extracts it to a given location
 func ExtractFromRemoteFile(location string, url string) error {
 
 	// Get the data
