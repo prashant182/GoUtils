@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 )
 
 //ExtractFromRemoteFile This utility function downloads the file and extracts it to a given location
@@ -26,37 +27,51 @@ func ExtractFromRemoteFile(location string, url string) error {
 
 	tarReader := tar.NewReader(uncompressedStream)
 
-	for true {
+	for {
 		header, err := tarReader.Next()
 
-		if err == io.EOF {
-			break
+		switch {
+
+		// if no more files are found return
+		case err == io.EOF:
+			return nil
+
+		// return any other error
+		case err != nil:
+			return err
+
+		// if the header is nil, just skip it (not sure how this happens)
+		case header == nil:
+			continue
 		}
 
-		if err != nil {
-			log.Fatalf("ExtractTarGz: Next() failed: %s", err.Error())
-		}
+		// the target location where the dir/file should be created
+		target := filepath.Join(location, header.Name)
 
+		// check the file type
 		switch header.Typeflag {
+
+		// if its a dir and it doesn't exist create it
 		case tar.TypeDir:
-			if err := os.Mkdir(location+"/"+header.Name, 0755); err != nil {
-				log.Fatalf("ExtractTarGz: Mkdir() failed: %s", err.Error())
+			if _, err := os.Stat(target); err != nil {
+				if err := os.MkdirAll(target, 0755); err != nil {
+					return err
+				}
 			}
+
+		// if it's a file create it
 		case tar.TypeReg:
-			outFile, err := os.Create(header.Name)
+			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
 			if err != nil {
-				log.Fatalf("ExtractTarGz: Create() failed: %s", err.Error())
+				return err
 			}
-			defer outFile.Close()
-			if _, err := io.Copy(outFile, tarReader); err != nil {
-				log.Fatalf("ExtractTarGz: Copy() failed: %s", err.Error())
+
+			// copy over contents
+			if _, err := io.Copy(f, tarReader); err != nil {
+				return err
 			}
-		default:
-			log.Fatalf(
-				"ExtractTarGz: uknown type: %s in %s",
-				header.Typeflag,
-				header.Name)
+
+			f.Close()
 		}
 	}
-	return err
 }
